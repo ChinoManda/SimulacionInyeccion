@@ -24,8 +24,15 @@ type Sensores struct {
 type Inyector struct {
 	ID int
 	Accion chan float64
-  Log []float64
+  //Log []float64
 	Mu sync.Mutex
+}
+
+type ECU struct {
+	Sensores *Sensores
+	Inyectores []*Inyector
+	mapa map[int]map[int]float64 //[TPS][RPM]MS 
+	OrdenInyeccion []int
 }
 
 	func main()  {
@@ -33,11 +40,23 @@ type Inyector struct {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(mapa[1][3500])
-  sensores := &Sensores{}
+
+	  sensores := &Sensores{}
+		inyectores :=  []*Inyector{}
+		for i := 1; i <= 4; i++ {
+			iny := &Inyector{
+				ID: i,
+				Accion: make(chan float64),
+			}
+			inyectores = append(inyectores, iny)
+		  go iny.ejecutar()
+		}
+		Bosch := ECU {sensores, inyectores, mapa, orden}
   go sensores.simularTPS_1()
 	go sensores.simularRPMporTPS()
-  
+  go Bosch.run()
+
+	/* 
   for {
   time.Sleep(200 * time.Millisecond)
 	sensores.Mu.Lock()
@@ -45,10 +64,39 @@ type Inyector struct {
   fmt.Println(discretizar(sensores.RPM, rpmOpciones), "RPM")
 	sensores.Mu.Unlock()
   }	
+	*/
 	select {}
+	
 	}
 
+func (e *ECU) run(){
 
+	for {
+		e.Sensores.Mu.Lock()
+		tps := int(e.Sensores.TPS)
+		rpm := discretizar(e.Sensores.RPM, rpmOpciones)
+    e.Sensores.Mu.Unlock()
+
+		delay := calcularDelay(float64(rpm))
+
+    for _, id := range e.OrdenInyeccion {
+			tiempo := e.mapa[tps][rpm]
+			go func(iny *Inyector, t float64)  {
+				iny.Accion <- t
+			}(e.Inyectores[id-1], tiempo)
+     fmt.Println(delay, rpm)
+      time.Sleep(delay)
+		}
+	}
+	
+}
+
+func (i *Inyector) ejecutar(){
+for tiempo := range i.Accion {
+	fmt.Println("Inyectando")
+	fmt.Println(i.ID , tiempo)
+	}
+}
 
 func (s *Sensores)simularTPS_1()  {
 	for {
@@ -56,13 +104,13 @@ func (s *Sensores)simularTPS_1()  {
 	 s.Mu.Lock()
 	 s.TPS = i
 	 s.Mu.Unlock()
-	 time.Sleep(200 * time.Millisecond)
+	 time.Sleep(500 * time.Millisecond)
 	}
 	for i := 100.0; i >= 0; i-=5 {	
 	 s.Mu.Lock()
 	 s.TPS = i
 	 s.Mu.Unlock()
-	 time.Sleep(200 * time.Millisecond)
+	 time.Sleep(500 * time.Millisecond)
 	}
 	}
 }
@@ -130,6 +178,10 @@ func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 	return mapa, nil
 }
 
+func calcularDelay(rpm float64) time.Duration {
+	segundos := (60.0 / rpm) / 2.0
+	return time.Duration(segundos * float64(time.Second))
+}
 func discretizar(valor float64, opciones []int) int {
 	minDiff := math.MaxFloat64
 	masCercano := opciones[0]
