@@ -9,10 +9,16 @@ import (
 	"sync"
 	"time"
 	"math"
+	"runtime"
 )
 
 var rpmOpciones = []int{800, 1500, 2500, 3500, 4500, 5500, 6500}
 var orden = []int{1, 3, 4, 2}
+var (
+	memStats runtime.MemStats
+	prevGC   uint32
+)
+
 
 type Sensores struct {
 	TPS float64 
@@ -49,12 +55,12 @@ type ECU struct {
 				Accion: make(chan float64),
 			}
 			inyectores = append(inyectores, iny)
-		  go iny.ejecutar()
+		  go iny.testDelay()
 		}
 		Bosch := ECU {sensores, inyectores, mapa, orden}
-  go sensores.simularTPS_1()
-	go sensores.simularRPMporTPS()
-  go Bosch.run()
+ 
+	  go sensores.simularTPSaFondo()
+    go Bosch.testDelay()
 
 	/* 
   for {
@@ -68,7 +74,31 @@ type ECU struct {
 	select {}
 	
 	}
+func (e *ECU) testDelay() {
+	for {
+		start := time.Now()
+		e.Sensores.Mu.Lock()
+		tps := int(e.Sensores.TPS)
+		rpm := e.Sensores.RPM
+    e.Sensores.Mu.Unlock()
 
+		delay := calcularDelay(float64(rpm))
+
+    for _, id := range e.OrdenInyeccion {
+			tiempo := e.mapa[tps][1500]
+			go func(iny *Inyector, t float64)  {
+				iny.Accion <- t
+			}(e.Inyectores[id-1], tiempo)
+      time.Sleep(delay)
+		}
+
+		ciclo := time.Since(start)
+		cicloEsperado := delay * 4
+		fmt.Println(rpm)
+		fmt.Println("Diff: ", ciclo - cicloEsperado)
+	}
+	
+}
 func (e *ECU) run(){
 
 	for {
@@ -100,6 +130,12 @@ func (e *ECU) run(){
 	
 }
 
+func (i *Inyector) testDelay() {
+	for tiempo := range i.Accion{
+		tiempo += 1
+	}
+}
+
 func (i *Inyector) ejecutar(){
 for tiempo := range i.Accion {
 	fmt.Println("Inyectando")
@@ -107,6 +143,18 @@ for tiempo := range i.Accion {
 	}
 }
 
+func (s *Sensores)simularTPSaFondo()  {
+		s.Mu.Lock()
+		s.TPS = 100
+		s.RPM = 1500
+		s.Mu.Unlock()
+		for {
+			s.Mu.Lock()
+			s.RPM += 500
+      s.Mu.Unlock()
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 
 
 func (s *Sensores)simularTPS_1()  {
