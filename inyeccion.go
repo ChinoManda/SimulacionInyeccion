@@ -11,7 +11,7 @@ import (
 	"math"
 )
 
-var rpmOpciones = []int{800, 1500, 2500, 3500, 4500, 5500, 6500}
+var rpmList = []int{}
 var orden = []int{1, 3, 4, 2}
 
 type Sensores struct {
@@ -74,7 +74,7 @@ func (e *ECU) run(){
 	for {
 		e.Sensores.Mu.Lock()
 		tps := int(e.Sensores.TPS)
-		rpm := discretizar(e.Sensores.RPM, rpmOpciones)
+		rpm := discretizar(e.Sensores.RPM, rpmList)
     e.Sensores.Mu.Unlock()
 
 		delay := calcularDelay(float64(rpm))
@@ -142,7 +142,6 @@ func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 		return nil, err
 	}
 
-	rpmList := []int{}
 	for _, h := range headers[1:] {
 		rpmStr := strings.TrimPrefix(h, "RPM")
 		rpm, err := strconv.Atoi(rpmStr)
@@ -151,7 +150,6 @@ func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 		}
 		rpmList = append(rpmList, rpm)
 	}
-
 	mapa := make(map[int]map[int]float64)
 
 	for {
