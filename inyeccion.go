@@ -72,6 +72,7 @@ type ECU struct {
 func (e *ECU) run(){
 
 	for {
+		start := time.Now()
 		e.Sensores.Mu.Lock()
 		tps := int(e.Sensores.TPS)
 		rpm := discretizar(e.Sensores.RPM, rpmOpciones)
@@ -84,9 +85,17 @@ func (e *ECU) run(){
 			go func(iny *Inyector, t float64)  {
 				iny.Accion <- t
 			}(e.Inyectores[id-1], tiempo)
-     fmt.Println(delay, rpm)
       time.Sleep(delay)
 		}
+
+		ciclo := time.Since(start)
+		cicloEsperado := delay * 4
+		fmt.Println("Diff: ", ciclo - cicloEsperado)
+		/*
+		if ciclo > cicloEsperado+time.Millisecond*2 {
+			fmt.Println("Murio" , rpm , ciclo, cicloEsperado)
+		}
+		*/
 	}
 	
 }
@@ -97,6 +106,8 @@ for tiempo := range i.Accion {
 	fmt.Println(i.ID , tiempo)
 	}
 }
+
+
 
 func (s *Sensores)simularTPS_1()  {
 	for {
