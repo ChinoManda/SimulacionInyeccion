@@ -40,7 +40,6 @@ type ECU struct {
 	if err != nil {
 		panic(err)
 	}
-
 	  sensores := &Sensores{}
 		inyectores :=  []*Inyector{}
 		for i := 1; i <= 4; i++ {
@@ -55,18 +54,7 @@ type ECU struct {
   go sensores.simularTPS_1()
 	go sensores.simularRPMporTPS()
   go Bosch.run()
-
-	/* 
-  for {
-  time.Sleep(200 * time.Millisecond)
-	sensores.Mu.Lock()
-	fmt.Println(sensores.TPS, "TPS")
-  fmt.Println(discretizar(sensores.RPM, rpmOpciones), "RPM")
-	sensores.Mu.Unlock()
-  }	
-	*/
-	select {}
-	
+	select {}	
 	}
 
 func (e *ECU) run(){
@@ -74,7 +62,7 @@ func (e *ECU) run(){
 	for {
 		e.Sensores.Mu.Lock()
 		tps := int(e.Sensores.TPS)
-		rpm := discretizar(e.Sensores.RPM, rpmList)
+		rpm := buscarRPM(rpmList, int(e.Sensores.RPM))
     e.Sensores.Mu.Unlock()
 
 		delay := calcularDelay(float64(rpm))
@@ -84,7 +72,6 @@ func (e *ECU) run(){
 			go func(iny *Inyector, t float64)  {
 				iny.Accion <- t
 			}(e.Inyectores[id-1], tiempo)
-     fmt.Println(delay, rpm)
       time.Sleep(delay)
 		}
 	}
@@ -93,8 +80,8 @@ func (e *ECU) run(){
 
 func (i *Inyector) ejecutar(){
 for tiempo := range i.Accion {
-	fmt.Println("Inyectando")
-	fmt.Println(i.ID , tiempo)
+  fmt.Println("Inyectando")
+  fmt.Println(i.ID , tiempo)
 	}
 }
 
@@ -127,6 +114,56 @@ for {
 	}
 	
 }
+
+func buscarRPM(rpmList []int, rpm int) int {
+	lo := 0
+	hi := len(rpmList)-1
+
+  for lo<=hi {
+
+	mid := (hi + lo) / 2
+	if rpmList[lo] == rpm {
+		return rpmList[lo]
+	}
+	if rpmList[mid] == rpm {
+		return rpmList[mid]
+	}
+
+	if rpmList[hi] == rpm {
+		return rpmList[hi]
+	}
+
+	if rpmList[mid] < rpm {
+    lo = mid+1
+	} 
+	if rpmList[mid] > rpm {
+		hi = mid -1
+	}
+ } //si lo y hi se dan vuelta, ahi se rompe el for, si cae justo en uno se rompe antes, si termina el for hay q interpolar
+ 
+ if lo >= len(rpmList){ //si lo se pasa para adelante es el mayor
+	 return rpmList[len(rpmList)-1]
+ }
+
+ if hi < 0 { //si hi queda negativo es el mas chico (0)
+	 return rpmList[0]
+ }
+
+ if abs(rpm - rpmList[lo]) > abs(rpm -rpmList[hi]){
+	 return rpmList[lo]
+ } else {
+	 return rpmList[hi]
+ }
+  
+}
+
+func abs(a int) int {
+    if a >= 0 {
+        return a
+    }
+    return -a
+}
+
 func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 	file, err := os.Open(path)
 	if err != nil {
