@@ -40,9 +40,6 @@ type ECU struct {
 	if err != nil {
 		panic(err)
 	}
-  testing()
-
-
 	  sensores := &Sensores{}
 		inyectores :=  []*Inyector{}
 		for i := 1; i <= 4; i++ {
@@ -57,35 +54,15 @@ type ECU struct {
   go sensores.simularTPS_1()
 	go sensores.simularRPMporTPS()
   go Bosch.run()
-
-	/* 
-  for {
-  time.Sleep(200 * time.Millisecond)
-	sensores.Mu.Lock()
-	fmt.Println(sensores.TPS, "TPS")
-  fmt.Println(discretizar(sensores.RPM, rpmOpciones), "RPM")
-	sensores.Mu.Unlock()
-  }	
-	*/
-	select {}
-	
+	select {}	
 	}
-
-func testing(){
- var i, j int
- fmt.Println(rpmList)
- fmt.Scan(&i)
- j = buscarRPM(rpmList, i)
- fmt.Println(j)
- time.Sleep(100 * time.Second)
-}
 
 func (e *ECU) run(){
 
 	for {
 		e.Sensores.Mu.Lock()
 		tps := int(e.Sensores.TPS)
-		rpm := discretizar(e.Sensores.RPM, rpmList)
+		rpm := buscarRPM(rpmList, int(e.Sensores.RPM))
     e.Sensores.Mu.Unlock()
 
 		delay := calcularDelay(float64(rpm))
@@ -95,7 +72,6 @@ func (e *ECU) run(){
 			go func(iny *Inyector, t float64)  {
 				iny.Accion <- t
 			}(e.Inyectores[id-1], tiempo)
-     fmt.Println(delay, rpm)
       time.Sleep(delay)
 		}
 	}
@@ -104,8 +80,8 @@ func (e *ECU) run(){
 
 func (i *Inyector) ejecutar(){
 for tiempo := range i.Accion {
-	fmt.Println("Inyectando")
-	fmt.Println(i.ID , tiempo)
+  fmt.Println("Inyectando")
+  fmt.Println(i.ID , tiempo)
 	}
 }
 
