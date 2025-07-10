@@ -127,6 +127,49 @@ for {
 	}
 	
 }
+
+func buscarRPM(rpmList []int, rpm) int{
+	lo := 0
+	hi := len(rpmList)-1
+
+  for lo<=hi {
+
+	mid := (hi + lo) / 2
+	if rpmList[lo] = rpm {
+		return rpmList[lo]
+	}
+	if rpmList[mid] = rpm {
+		return rpmList[mid]
+	}
+
+	if rpmList[hi] = rpm {
+		return rpmList[hi]
+	}
+
+	if rpmList[mid] < rpm {
+    lo = mid+1
+	} 
+	if rpmList[mid] > rpm {
+		hi = mid -1
+	}
+ } //si lo y hi se dan vuelta, ahi se rompe el for, si cae justo en uno se rompe antes, si termina el for hay q interpolar
+ 
+ if lo >= len(rpmList){ //si lo se pasa para adelante es el mayor
+	 return rpmList[len(rpmList)-1]
+ }
+
+ if hi < 0 { //si hi queda negativo es el mas chico (0)
+	 return rpmList[0]
+ }
+
+ if math.Abs(rpm - rpmList[lo]) > math.Abs(rpm -rpmList[hi]){
+	 return rpmList[lo]
+ } else {
+	 return rpmList[hi]
+ }
+  
+}
+
 func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 	file, err := os.Open(path)
 	if err != nil {
