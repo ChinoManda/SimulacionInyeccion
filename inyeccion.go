@@ -40,6 +40,8 @@ type ECU struct {
 	if err != nil {
 		panic(err)
 	}
+  testing()
+
 
 	  sensores := &Sensores{}
 		inyectores :=  []*Inyector{}
@@ -68,6 +70,15 @@ type ECU struct {
 	select {}
 	
 	}
+
+func testing(){
+ var i, j int
+ fmt.Println(rpmList)
+ fmt.Scan(&i)
+ j = buscarRPM(rpmList, i)
+ fmt.Println(j)
+ time.Sleep(100 * time.Second)
+}
 
 func (e *ECU) run(){
 
@@ -128,21 +139,21 @@ for {
 	
 }
 
-func buscarRPM(rpmList []int, rpm) int{
+func buscarRPM(rpmList []int, rpm int) int {
 	lo := 0
 	hi := len(rpmList)-1
 
   for lo<=hi {
 
 	mid := (hi + lo) / 2
-	if rpmList[lo] = rpm {
+	if rpmList[lo] == rpm {
 		return rpmList[lo]
 	}
-	if rpmList[mid] = rpm {
+	if rpmList[mid] == rpm {
 		return rpmList[mid]
 	}
 
-	if rpmList[hi] = rpm {
+	if rpmList[hi] == rpm {
 		return rpmList[hi]
 	}
 
@@ -162,12 +173,19 @@ func buscarRPM(rpmList []int, rpm) int{
 	 return rpmList[0]
  }
 
- if math.Abs(rpm - rpmList[lo]) > math.Abs(rpm -rpmList[hi]){
+ if abs(rpm - rpmList[lo]) > abs(rpm -rpmList[hi]){
 	 return rpmList[lo]
  } else {
 	 return rpmList[hi]
  }
   
+}
+
+func abs(a int) int {
+    if a >= 0 {
+        return a
+    }
+    return -a
 }
 
 func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
