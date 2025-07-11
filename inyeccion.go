@@ -36,6 +36,7 @@ mapa map[int]map[int]float64 //[TPS][RPM]MS
 }
 
 func main()  {
+  os.WriteFile("delay.csv", []byte("RPM,Delta_ms\n"), 0644)
 	mapa, err := cargarMapaInyeccion("mapa_inyeccion.csv")
 	if err != nil {
 		panic(err)
@@ -51,9 +52,8 @@ func main()  {
 		  go iny.ejecutar()
 		}
 		Bosch := ECU {sensores, inyectores, mapa, orden}
-  go sensores.simularTPS_1()
-	go sensores.simularRPMporTPS()
-  go Bosch.run()
+  go sensores.simularTPSaFondo()
+  go Bosch.testDelay()
 	select {}	
 	}
 
@@ -78,11 +78,10 @@ func (e *ECU) run(){
       time.Sleep(delay)
 		}
 				duracion := time.Since(start)
-		fmt.Printf("\n⏱️ Duración total del ciclo: %.3f ms | Esperado: %.3f ms | Δ: %.3f ms\n",
+		  fmt.Printf("\n⏱️ Duración total del ciclo: %.3f ms | Esperado: %.3f ms | Δ: %.3f ms\n",
 			float64(duracion.Microseconds())/1000,
 			float64(tiempoEsperado.Microseconds())/1000,
-			float64(duracion.Microseconds()-tiempoEsperado.Microseconds())/1000)
-
+      float64(duracion.Microseconds()-tiempoEsperado.Microseconds())/1000)
 	time.Sleep(100 * time.Millisecond) // para ver la diferencia entre ciclos
 		ciclo++
 	}
@@ -90,6 +89,40 @@ func (e *ECU) run(){
 	
 }
 
+func (e *ECU) testDelay(){
+ ciclo := 1
+	for {
+		start := time.Now()
+		e.Sensores.Mu.Lock()
+		tps := int(e.Sensores.TPS)
+		rpm := int(e.Sensores.RPM)
+    e.Sensores.Mu.Unlock()
+
+		delay := calcularDelay(float64(rpm))
+		tiempoEsperado := delay * 4
+
+    for _, id := range e.OrdenInyeccion {
+			tiempo := e.mapa[tps][7000]
+      mostrarEstadoInyectores(id, ciclo, tps, rpm, e.Inyectores)
+			go func(iny *Inyector, t float64)  {
+				iny.Accion <- t
+			}(e.Inyectores[id-1], tiempo)
+      time.Sleep(delay)
+		}
+				duracion := time.Since(start)
+      delta := float64(duracion.Microseconds()-tiempoEsperado.Microseconds()) / 1000.0
+			fmt.Println(delta)
+		fmt.Printf("\n⏱️ Duración total del ciclo: %.3f ms | Esperado: %.3f ms | Δ: %.3f ms\n",
+			float64(duracion.Microseconds())/1000,
+			float64(tiempoEsperado.Microseconds())/1000,
+			float64(delta)) 
+      logDelay(rpm, delta)
+	time.Sleep(100 * time.Millisecond) // para ver la diferencia entre ciclos
+		ciclo++
+	}
+
+	
+}
 func (i *Inyector) ejecutar(){
 for tiempo := range i.Accion {
   fmt.Println("Inyectando")
@@ -99,6 +132,19 @@ for tiempo := range i.Accion {
 	i.Mu.Unlock()
 	}
 }
+func (s *Sensores)simularTPSaFondo()  {
+		s.Mu.Lock()
+		s.TPS = 100
+		s.RPM = 1500
+		s.Mu.Unlock()
+		for {
+			s.Mu.Lock()
+			s.RPM += 500
+      s.Mu.Unlock()
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
 
 func (s *Sensores)simularTPS_1()  {
 	for {
@@ -241,6 +287,23 @@ func cargarMapaInyeccion(path string) (map[int]map[int]float64, error) {
 	}
 
 	return mapa, nil
+}
+
+func logDelay(rpm int, deltaMs float64) error {
+	file, err := os.OpenFile("delay.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err 
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	record := []string{
+		strconv.Itoa(rpm),
+		fmt.Sprintf("%.4f", deltaMs),
+	}
+	return writer.Write(record)
 }
 
 func calcularDelay(rpm float64) time.Duration {
