@@ -24,7 +24,7 @@ type Sensores struct {
 type Inyector struct {
 	ID int
 	Accion chan float64
-  //Log []float64
+  Log int
 	Mu sync.Mutex
 }
 
@@ -84,7 +84,7 @@ func (e *ECU) run(){
 
     for _, id := range e.OrdenInyeccion {
 			tiempo := e.mapa[tps][rpm]
-      mostrarEstadoInyectores(id, ciclo, tps, rpm)
+      mostrarEstadoInyectores(id, ciclo, tps, rpm, e.Inyectores)
 			go func(iny *Inyector, t float64)  {
 				iny.Accion <- t
 			}(e.Inyectores[id-1], tiempo)
@@ -106,7 +106,10 @@ func (e *ECU) run(){
 func (i *Inyector) ejecutar(){
 for tiempo := range i.Accion {
   fmt.Println("Inyectando")
-  fmt.Println(i.ID , tiempo)
+	fmt.Println("Tiempo de Inyección:",tiempo, "ms")
+	i.Mu.Lock()
+	i.Log++
+	i.Mu.Unlock()
 	}
 }
 
@@ -126,20 +129,22 @@ func (s *Sensores)simularTPS_1()  {
 	}
 	}
 }
-func mostrarEstadoInyectores(activo int, ciclo int, tps int, rpm int) {
+func mostrarEstadoInyectores(activo int, ciclo int, tps int, rpm int , inyectores []*Inyector) {
 	// Limpiar pantalla
 	fmt.Print("\033[H\033[2J") // ANSI escape: clear screen
 
 	fmt.Printf("====== CICLO %d ======\n", ciclo)
 	fmt.Printf("🚗 RPM: %d | TPS: %d\n\n", rpm, tps)
 	fmt.Println("💉 Estado de Inyectores:")
-
-	for i := 1; i <= 4; i++ {
-		if i == activo {
-			fmt.Printf("[Inyector %d] ●\n", i)
-		} else {
-			fmt.Printf("[Inyector %d] ○\n", i)
+  
+	for _, iny := range inyectores {
+		iny.Mu.Lock()
+		simbolo := "○"
+		if iny.ID == activo {
+			simbolo = "●"
 		}
+		fmt.Printf("[Inyector %d] %s  (%d inyecciones)\n", iny.ID, simbolo, iny.Log)
+		iny.Mu.Unlock()
 	}
 }
 func (s *Sensores) simularRPMporTPS() {
