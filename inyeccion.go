@@ -31,7 +31,7 @@ type Inyector struct {
 type ECU struct {
 	Sensores *Sensores
 	Inyectores []*Inyector
-	mapa map[int]map[int]float64 //[TPS][RPM]MS 
+mapa map[int]map[int]float64 //[TPS][RPM]MS 
 	OrdenInyeccion []int
 }
 
@@ -56,25 +56,50 @@ type ECU struct {
   go Bosch.run()
 	select {}	
 	}
-
-func (e *ECU) run(){
-
+func (s *Sensores) testing(){
+	var j int
 	for {
+		
+	  s.Mu.Lock()
+		rpm := int(s.RPM)
+		fmt.Println(rpm)
+    s.Mu.Unlock()
+		
+ j = buscarRPM(rpmList, rpm)
+ fmt.Println("-->", j)
+ time.Sleep(100 * time.Millisecond)
+ }
+}
+func (e *ECU) run(){
+ ciclo := 1
+	for {
+		start := time.Now()
 		e.Sensores.Mu.Lock()
 		tps := int(e.Sensores.TPS)
 		rpm := buscarRPM(rpmList, int(e.Sensores.RPM))
     e.Sensores.Mu.Unlock()
 
 		delay := calcularDelay(float64(rpm))
+		tiempoEsperado := delay * 4
 
     for _, id := range e.OrdenInyeccion {
 			tiempo := e.mapa[tps][rpm]
+      mostrarEstadoInyectores(id, ciclo, tps, rpm)
 			go func(iny *Inyector, t float64)  {
 				iny.Accion <- t
 			}(e.Inyectores[id-1], tiempo)
       time.Sleep(delay)
 		}
+				duracion := time.Since(start)
+		fmt.Printf("\n⏱️ Duración total del ciclo: %.3f ms | Esperado: %.3f ms | Δ: %.3f ms\n",
+			float64(duracion.Microseconds())/1000,
+			float64(tiempoEsperado.Microseconds())/1000,
+			float64(duracion.Microseconds()-tiempoEsperado.Microseconds())/1000)
+
+	time.Sleep(100 * time.Millisecond) // para ver la diferencia entre ciclos
+		ciclo++
 	}
+
 	
 }
 
@@ -101,8 +126,21 @@ func (s *Sensores)simularTPS_1()  {
 	}
 	}
 }
+func mostrarEstadoInyectores(activo int, ciclo int, tps int, rpm int) {
+	// Limpiar pantalla
+	fmt.Print("\033[H\033[2J") // ANSI escape: clear screen
 
-func (s Sensores)leerTPS()  {	
+	fmt.Printf("====== CICLO %d ======\n", ciclo)
+	fmt.Printf("🚗 RPM: %d | TPS: %d\n\n", rpm, tps)
+	fmt.Println("💉 Estado de Inyectores:")
+
+	for i := 1; i <= 4; i++ {
+		if i == activo {
+			fmt.Printf("[Inyector %d] ●\n", i)
+		} else {
+			fmt.Printf("[Inyector %d] ○\n", i)
+		}
+	}
 }
 func (s *Sensores) simularRPMporTPS() {
 for {
@@ -120,8 +158,8 @@ func buscarRPM(rpmList []int, rpm int) int {
 	hi := len(rpmList)-1
 
   for lo<=hi {
-
 	mid := (hi + lo) / 2
+
 	if rpmList[lo] == rpm {
 		return rpmList[lo]
 	}
@@ -140,7 +178,7 @@ func buscarRPM(rpmList []int, rpm int) int {
 		hi = mid -1
 	}
  } //si lo y hi se dan vuelta, ahi se rompe el for, si cae justo en uno se rompe antes, si termina el for hay q interpolar
- 
+
  if lo >= len(rpmList){ //si lo se pasa para adelante es el mayor
 	 return rpmList[len(rpmList)-1]
  }
@@ -149,7 +187,7 @@ func buscarRPM(rpmList []int, rpm int) int {
 	 return rpmList[0]
  }
 
- if abs(rpm - rpmList[lo]) > abs(rpm -rpmList[hi]){
+ if abs(rpm - rpmList[lo]) < abs(rpm -rpmList[hi]){
 	 return rpmList[lo]
  } else {
 	 return rpmList[hi]
