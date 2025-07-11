@@ -35,7 +35,7 @@ mapa map[int]map[int]float64 //[TPS][RPM]MS
 	OrdenInyeccion []int
 }
 
-	func main()  {
+func main()  {
 	mapa, err := cargarMapaInyeccion("mapa_inyeccion.csv")
 	if err != nil {
 		panic(err)
@@ -56,20 +56,7 @@ mapa map[int]map[int]float64 //[TPS][RPM]MS
   go Bosch.run()
 	select {}	
 	}
-func (s *Sensores) testing(){
-	var j int
-	for {
-		
-	  s.Mu.Lock()
-		rpm := int(s.RPM)
-		fmt.Println(rpm)
-    s.Mu.Unlock()
-		
- j = buscarRPM(rpmList, rpm)
- fmt.Println("-->", j)
- time.Sleep(100 * time.Millisecond)
- }
-}
+
 func (e *ECU) run(){
  ciclo := 1
 	for {
